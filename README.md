@@ -35,6 +35,18 @@ python main.py                      # 127.0.0.1:5001
 #               AI_API_KEY / AI_MODEL for real LLM mode
 ```
 
+Or just open the browser console and click through the demo path:
+
+```
+http://localhost:5001/console
+```
+
+Self-contained page (no CDN, no build): pick a persona, sign in, then fire
+`skill-analysis`, `roadmap`, `matches`, `market/insights`, or start an
+assessment — real JSON from the real dev.db, with status codes and latency.
+
+### curl equivalent
+
 ```bash
 curl localhost:5001/api/auth/personas
 curl -X POST localhost:5001/api/auth/demo-login \
