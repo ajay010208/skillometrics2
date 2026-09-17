@@ -55,6 +55,24 @@ curl -X POST localhost:5001/api/auth/demo-login \
 # then use the returned profile id as:  -H "x-demo-token: <id>"
 ```
 
+## Run with the real frontend (combined mode)
+
+The React app works against this backend unchanged — its Vite proxy target is
+configurable in the main repo:
+
+```bash
+# terminal 1
+cd unified-backend && python main.py          # :5001
+
+# terminal 2 (main repo) — point the web app at the Python backend
+API_TARGET=http://localhost:5001 npm run dev -w web
+```
+
+Open the app (default :5173, or `WEB_PORT=5002` to run both stacks side by
+side), log in with a demo persona, and the whole trainee path — skill
+analysis with the radar chart, Reality Check, roadmap, assessments — is
+served by the single FastAPI process.
+
 ## Status
 
 Prototype (~880 lines, demo path). Not ported: recruiter/provider/admin

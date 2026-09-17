@@ -125,6 +125,8 @@ class LearningResource(Base):
     cost: Mapped[str] = mapped_column(String)
     durationHours: Mapped[float] = mapped_column(Float)
     rating: Mapped[float] = mapped_column(Float, default=4.5)
+    prerequisites: Mapped[str | None] = mapped_column(String, nullable=True)  # JSON text in Prisma schema
+    format: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class RoadmapItem(Base):
@@ -481,7 +483,9 @@ async def skill_analysis(request: Request, db: Session = Depends(db_session)):
             "gap": max(0, r["minLevel"] - level), "met": level >= r["minLevel"],
             "resources": [{"id": x.id, "title": x.title, "platform": x.platform,
                            "url": x.url, "language": x.language, "cost": x.cost,
-                           "durationHours": x.durationHours, "rating": x.rating}
+                           "durationHours": x.durationHours, "rating": x.rating,
+                           "prerequisites": J(x.prerequisites) or [],
+                           "format": x.format}
                           for x in resources]})
 
     jobs = db.execute(select(Job).where(Job.active,
