@@ -131,7 +131,8 @@
       <button class="btn liquid-glass" onclick="call('GET','/api/roadmap')"><span class="method m-get">GET</span>roadmap</button>
       <button class="btn liquid-glass" onclick="call('GET','/api/jobs/matches')"><span class="method m-get">GET</span>jobs/matches</button>
       <button class="btn liquid-glass" onclick="call('GET','/api/market/insights')"><span class="method m-get">GET</span>market/insights</button>
-      <button class="btn liquid-glass" onclick="startAssessment()"><span class="method m-post">POST</span>assessments/start</button>
+      <button class="btn liquid-glass" onclick="startAssessment()"><span class="method m-post">POST</span>assessments/start (full loop)</button>
+      <button class="btn liquid-glass" id="submitBtn" style="display:none" onclick="submitAssessment()"><span class="method m-post">POST</span>submit sample answers</button>
     </aside>
     <section class="card liquid-glass rise-d3">
       <div id="status">Pick a persona and an endpoint.</div>
@@ -175,8 +176,30 @@ async function call(method, url, body) {
     $('status').textContent = method + ' ' + url + '  →  failed: ' + e;
   }
 }
+let assessment = null;
 async function startAssessment() {
-  await call('POST', '/api/assessments/start', {});
+  if (!token) { $('status').textContent = 'Sign in as the trainee persona first.'; return; }
+  $('status').textContent = 'POST assessments/start — picking next roadmap skill…';
+  const rm = await (await fetch('/api/roadmap', { headers: { 'x-demo-token': token } })).json();
+  const skill = (rm.items || []).map(i => i.skill).find(Boolean);
+  if (!skill) { $('status').textContent = 'No roadmap skill found for this persona (trainee only, and a roadmap must exist).'; return; }
+  await call('POST', '/api/assessments/start', { skillId: skill.id });
+  try {
+    const data = JSON.parse($('out').textContent);
+    if (data.id && data.questions) {
+      assessment = { id: data.id, total: data.questions.length };
+      $('out').textContent += '\n\n→ quiz ready: ' + data.questions.length +
+        ' questions on "' + data.skill.name + '". Click "submit sample answers" to score it.';
+      $('submitBtn').style.display = 'flex';
+    }
+  } catch (e) { /* start failed — output already shows the error */ }
+}
+async function submitAssessment() {
+  if (!assessment) return;
+  await call('POST', '/api/assessments/' + assessment.id + '/submit',
+             { answers: Array(assessment.total).fill(0) });
+  assessment = null;
+  $('submitBtn').style.display = 'none';
 }
 boot();
 </script>
