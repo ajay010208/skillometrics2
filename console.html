@@ -152,15 +152,21 @@ async function boot() {
     const ps = await (await fetch('/api/auth/personas')).json();
     $('persona').innerHTML = '<option value="">— choose —</option>' +
       ps.map(p => '<option value="' + p.email + '">' + p.name + ' (' + p.role + ')</option>').join('');
+    if (ps.length) $('persona').value = ps[0].email;   // preselect trainee: button never dead-ends
   } catch (e) { $('health').textContent = 'health failed'; }
 }
 async function login() {
-  if (!$('persona').value) return;
-  const r = await fetch('/api/auth/demo-login', { method:'POST',
-    headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: $('persona').value }) });
-  token = (await r.json()).id || null;
-  const me = await (await fetch('/api/auth/me', { headers:{ 'x-demo-token': token } })).json();
-  $('who').innerHTML = 'Signed in as <b>' + (me.profile ? me.profile.name : 'persona') + '</b>';
+  try {
+    if (!$('persona').value && $('persona').options.length > 1)
+      $('persona').value = $('persona').options[1].value;   // fall back to first persona
+    if (!$('persona').value) { $('who').textContent = 'No personas available — is the server healthy?'; return; }
+    const r = await fetch('/api/auth/demo-login', { method:'POST',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: $('persona').value }) });
+    if (!r.ok) { $('who').textContent = 'Sign-in failed: HTTP ' + r.status; return; }
+    token = (await r.json()).id || null;
+    const me = await (await fetch('/api/auth/me', { headers:{ 'x-demo-token': token } })).json();
+    $('who').innerHTML = 'Signed in as <b>' + (me.profile ? me.profile.name : 'persona') + '</b>';
+  } catch (e) { $('who').textContent = 'Sign-in failed: ' + e; }
 }
 async function call(method, url, body) {
   const t0 = performance.now();
