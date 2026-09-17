@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SkilloMetrics — Unified Python Backend Console</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* SkilloMetrics palette + glass kit, ported from apps/web (Opening.tsx / index.css) */
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: hsl(201 100% 13%); color:#fff;
+         font:15px/1.55 'Inter',system-ui,-apple-system,'Segoe UI',sans-serif; }
+  /* fullscreen looping video, exactly like the opening page */
+  .bg-video { position:fixed; inset:0; z-index:0; width:100%; height:100%; object-fit:cover; }
+  .bg-tint { position:fixed; inset:0; z-index:1;
+             background:linear-gradient(180deg, rgba(0,43,66,.45) 0%, rgba(0,30,47,.78) 100%); }
+  .shell { position:relative; z-index:2; min-height:100vh; display:flex; flex-direction:column; }
+
+  /* liquid glass — verbatim recipe from index.css (.liquid-glass) */
+  .liquid-glass {
+    background: rgba(255,255,255,0.04);
+    background-blend-mode: luminosity;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: none;
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  .liquid-glass::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    padding: 1.4px;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,0.45) 0%, rgba(255,255,255,0.15) 20%,
+      rgba(255,255,255,0) 40%, rgba(255,255,255,0) 60%,
+      rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.45) 100%);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  @keyframes fade-rise {
+    from { opacity: 0; transform: translateY(24px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .rise        { animation: fade-rise .8s ease-out both; }
+  .rise-d1     { animation: fade-rise .8s ease-out .15s both; }
+  .rise-d2     { animation: fade-rise .8s ease-out .3s both; }
+  .rise-d3     { animation: fade-rise .8s ease-out .45s both; }
+
+  nav { display:flex; align-items:center; justify-content:space-between; gap:14px;
+        max-width:80rem; margin:0 auto; width:100%; padding:22px 32px; }
+  .logo { font-family:'Instrument Serif',Georgia,serif; font-size:28px; letter-spacing:-.3px; }
+  .logo sup { font-size:11px; }
+  .nav-tags { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .tag { font-size:11.5px; color:rgba(255,255,255,.75); border-radius:999px; padding:6px 14px; }
+  .pill { font-size:11.5px; border-radius:999px; padding:6px 14px; }
+  .pill.ok { color:#6ee7b7; }
+  .pill.bad { color:#fca5a5; }
+
+  .hero { max-width:80rem; margin:0 auto; width:100%; text-align:center;
+          padding:52px 32px 30px; }
+  .overline { font-size:11.5px; letter-spacing:3.5px; color:#f59e0b; text-transform:uppercase; }
+  h1 { font-family:'Instrument Serif',Georgia,serif; font-weight:400;
+       font-size:clamp(40px,6vw,74px); line-height:1.02; letter-spacing:-2px; margin-top:14px; }
+  h1 em { font-style:normal; color:rgba(255,255,255,.55); }
+  .hero p { max-width:44rem; margin:16px auto 0; color:rgba(255,255,255,.6); font-size:16px; }
+
+  main { flex:1; width:100%; max-width:80rem; margin:0 auto; padding:26px 32px 40px;
+         display:grid; grid-template-columns:340px 1fr; gap:18px; align-items:start; }
+  @media (max-width: 820px){ main { grid-template-columns:1fr; } }
+  .card { border-radius:22px; padding:20px; }
+  h2 { font-size:11px; text-transform:uppercase; letter-spacing:2px; color:#fbbf24; margin:18px 0 10px; }
+  h2:first-child { margin-top:0; }
+  select, button { font:inherit; }
+  select { width:100%; background:rgba(255,255,255,.07); color:#fff;
+           border:1px solid rgba(255,255,255,.2); border-radius:999px; padding:10px 16px; }
+  .btn { display:flex; align-items:center; width:100%; text-align:left; color:#fff;
+         border-radius:999px; padding:10px 16px; margin:8px 0; cursor:pointer;
+         transition:transform .2s ease, background .2s ease; }
+  .btn:hover { transform:scale(1.03); background:rgba(255,255,255,.1); }
+  .btn.primary { background:rgba(245,158,11,.92); color:#00202f; font-weight:600; justify-content:center; }
+  .btn.primary:hover { background:#fbbf24; }
+  .method { display:inline-block; font-size:10.5px; font-weight:700; border-radius:999px;
+            padding:2px 9px; margin-right:10px; }
+  .m-get { background:rgba(245,158,11,.18); color:#fbbf24; }
+  .m-post { background:rgba(251,146,60,.2); color:#fb923c; }
+  .who { font-size:13px; color:rgba(255,255,255,.65); margin-top:10px; }
+  .who b { color:#fff; }
+  .hint { font-size:12.5px; color:rgba(255,255,255,.45); }
+  #status { font-size:12.5px; margin-bottom:10px; color:rgba(255,255,255,.65); }
+  pre { background:rgba(0,18,28,.5); border-radius:14px; padding:16px; color:#e6f2f8;
+        overflow:auto; font:12.5px/1.55 ui-monospace,Consolas,monospace; white-space:pre-wrap;
+        max-height:520px; }
+</style>
+</head>
+<body>
+<video class="bg-video" autoplay loop muted playsinline
+  src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260314_131748_f2ca2a28-fed7-44c8-b9a9-bd9acdd5ec31.mp4"></video>
+<div class="bg-tint"></div>
+
+<div class="shell">
+  <nav class="rise">
+    <div class="logo">SkilloMetrics<sup>®</sup></div>
+    <div class="nav-tags">
+      <span class="tag liquid-glass">unified Python backend — prototype</span>
+      <span id="health" class="pill liquid-glass bad">checking…</span>
+      <span id="aimode" class="tag liquid-glass"></span>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <div class="overline rise-d1">Unified Python Backend · Prototype</div>
+    <h1 class="rise-d1">One process. <em>Every layer.</em></h1>
+    <p class="rise-d2">API, AI logic and this console in a single FastAPI app — the AI
+    "service call" is just a function call. Reading the same dev.db as the Node stack.</p>
+  </div>
+
+  <main>
+    <aside class="card liquid-glass rise-d2">
+      <h2>Demo persona</h2>
+      <select id="persona"><option value="">loading…</option></select>
+      <button class="btn primary" onclick="login()">Sign in as persona</button>
+      <div class="who" id="who">Spectator — sign in to call protected endpoints.</div>
+      <h2>Try the demo path</h2>
+      <button class="btn liquid-glass" onclick="call('GET','/api/skill-analysis')"><span class="method m-get">GET</span>skill-analysis</button>
+      <button class="btn liquid-glass" onclick="call('GET','/api/roadmap')"><span class="method m-get">GET</span>roadmap</button>
+      <button class="btn liquid-glass" onclick="call('GET','/api/jobs/matches')"><span class="method m-get">GET</span>jobs/matches</button>
+      <button class="btn liquid-glass" onclick="call('GET','/api/market/insights')"><span class="method m-get">GET</span>market/insights</button>
+      <button class="btn liquid-glass" onclick="startAssessment()"><span class="method m-post">POST</span>assessments/start</button>
+    </aside>
+    <section class="card liquid-glass rise-d3">
+      <div id="status">Pick a persona and an endpoint.</div>
+      <pre id="out">// responses appear here</pre>
+    </section>
+  </main>
+</div>
+
+<script>
+let token = null;
+const $ = id => document.getElementById(id);
+async function boot() {
+  try {
+    const h = await (await fetch('/health')).json();
+    $('health').textContent = 'health ok'; $('health').className = 'pill liquid-glass ok';
+    $('aimode').textContent = 'ai: ' + h.aiMode;
+    const ps = await (await fetch('/api/auth/personas')).json();
+    $('persona').innerHTML = '<option value="">— choose —</option>' +
+      ps.map(p => '<option value="' + p.email + '">' + p.name + ' (' + p.role + ')</option>').join('');
+  } catch (e) { $('health').textContent = 'health failed'; }
+}
+async function login() {
+  if (!$('persona').value) return;
+  const r = await fetch('/api/auth/demo-login', { method:'POST',
+    headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: $('persona').value }) });
+  token = (await r.json()).id || null;
+  const me = await (await fetch('/api/auth/me', { headers:{ 'x-demo-token': token } })).json();
+  $('who').innerHTML = 'Signed in as <b>' + (me.profile ? me.profile.name : 'persona') + '</b>';
+}
+async function call(method, url, body) {
+  const t0 = performance.now();
+  try {
+    const r = await fetch(url, { method, headers: Object.assign(
+      body ? {'Content-Type':'application/json'} : {}, token ? {'x-demo-token': token} : {}),
+      body: body ? JSON.stringify(body) : undefined });
+    const ms = Math.round(performance.now() - t0);
+    const data = await r.json();
+    $('status').textContent = method + ' ' + url + '  →  ' + r.status + '  (' + ms + ' ms)';
+    $('out').textContent = JSON.stringify(data, null, 2);
+  } catch (e) {
+    $('status').textContent = method + ' ' + url + '  →  failed: ' + e;
+  }
+}
+async function startAssessment() {
+  await call('POST', '/api/assessments/start', {});
+}
+boot();
+</script>
+</body>
+</html>

@@ -720,137 +720,15 @@ async def chat(request: Request, body: dict, db: Session = Depends(db_session)):
 
 
 # ---------------------------------------------------------------------------
-# Browser console — a self-contained page for exploring the API
-# (no CDN, no build step: the whole UI is this one string)
+# Browser console — self-contained page for exploring the API
 # ---------------------------------------------------------------------------
-CONSOLE_HTML = """<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SkilloMetrics — Unified Python Backend Console</title>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>
-  /* SkilloMetrics palette: petrol hero hsl(201 100% 13%), amber #f59e0b, orange #fb923c */
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; margin: 0; }
-  body { background: hsl(201 100% 13%); color:#e8f1f5;
-         font:15px/1.55 'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
-         min-height:100vh; display:flex; flex-direction:column; }
-  header { padding:20px 28px; border-bottom:1px solid rgba(255,255,255,.12); display:flex;
-           align-items:center; gap:14px; flex-wrap:wrap; background:rgba(255,255,255,.03); }
-  header h1 { font-family:'Instrument Serif',Georgia,'Times New Roman',serif;
-              font-size:26px; font-weight:400; letter-spacing:.3px; }
-  .tag { font-size:11.5px; color:#9fc0cd; border:1px solid rgba(255,255,255,.18); border-radius:999px;
-         padding:3px 10px; }
-  .pill { font-size:11.5px; border-radius:999px; padding:3px 10px; border:1px solid; }
-  .pill.ok { color:#34d399; border-color:rgba(52,211,153,.5); background:rgba(52,211,153,.08); }
-  .pill.bad { color:#fca5a5; border-color:rgba(252,165,165,.4); }
-  main { flex:1; display:grid; grid-template-columns: 320px 1fr; gap:0; min-height:0; }
-  @media (max-width: 760px){ main { grid-template-columns: 1fr; } }
-  aside { border-right:1px solid rgba(255,255,255,.1); padding:18px; overflow-y:auto;
-          background:rgba(0,25,38,.45); }
-  section { padding:18px 22px; overflow-y:auto; }
-  h2 { font-size:11px; text-transform:uppercase; letter-spacing:1.6px; color:#f59e0b; margin:16px 0 8px; }
-  h2:first-child { margin-top:0; }
-  select, button { font:inherit; }
-  select { width:100%; background:rgba(255,255,255,.06); color:#e8f1f5;
-           border:1px solid rgba(255,255,255,.18); border-radius:10px; padding:9px 10px; }
-  .btn { display:block; width:100%; text-align:left; background:rgba(255,255,255,.05);
-         border:1px solid rgba(255,255,255,.14); color:#e8f1f5; border-radius:10px;
-         padding:9px 12px; margin:7px 0; cursor:pointer; }
-  .btn:hover { border-color:rgba(245,158,11,.65); background:rgba(245,158,11,.08); }
-  .btn.primary { background:#f59e0b; border-color:#f59e0b; color:#00202f; font-weight:600; text-align:center; }
-  .btn.primary:hover { background:#fbbf24; border-color:#fbbf24; }
-  .method { display:inline-block; font-size:10.5px; font-weight:700; border-radius:5px;
-            padding:1px 6px; margin-right:8px; vertical-align:1px; }
-  .m-get { background:rgba(245,158,11,.15); color:#fbbf24; }
-  .m-post { background:rgba(251,146,60,.15); color:#fb923c; }
-  .who { font-size:13px; color:#9fc0cd; margin-top:8px; }
-  .who b { color:#ffffff; }
-  #status { font-size:12.5px; margin-bottom:10px; color:#9fc0cd; }
-  pre { background:rgba(0,18,28,.55); border:1px solid rgba(255,255,255,.1); border-radius:12px;
-        padding:14px; color:#dcebf2; overflow:auto; font:12.5px/1.5 ui-monospace,Consolas,monospace;
-        white-space:pre-wrap; max-height: calc(100vh - 220px); }
-  .hint { font-size:12.5px; color:#7fa6b5; }
-</style>
-</head>
-<body>
-<header>
-  <h1>SkilloMetrics</h1>
-  <span class="tag">unified Python backend — prototype</span>
-  <span id="health" class="pill bad">checking…</span>
-  <span id="aimode" class="tag"></span>
-</header>
-<main>
-  <aside>
-    <h2>Demo persona</h2>
-    <select id="persona"><option value="">loading…</option></select>
-    <button class="btn primary" onclick="login()">Sign in as persona</button>
-    <div class="who" id="who">Spectator — sign in to call protected endpoints.</div>
-    <h2>Try the demo path</h2>
-    <button class="btn" onclick="call('GET','/api/skill-analysis')"><span class="method m-get">GET</span>skill-analysis</button>
-    <button class="btn" onclick="call('GET','/api/roadmap')"><span class="method m-get">GET</span>roadmap</button>
-    <button class="btn" onclick="call('GET','/api/jobs/matches')"><span class="method m-get">GET</span>jobs/matches</button>
-    <button class="btn" onclick="call('GET','/api/market/insights')"><span class="method m-get">GET</span>market/insights</button>
-    <button class="btn" onclick="startAssessment()"><span class="method m-post">POST</span>assessments/start</button>
-    <h2>Architecture note</h2>
-    <p class="hint">One FastAPI process serves this page, the REST API, and the AI logic —
-    the AI “service call” is just a function call here. Data comes from the same dev.db
-    the Express stack uses.</p>
-  </aside>
-  <section>
-    <div id="status">Pick a persona and an endpoint.</div>
-    <pre id="out">// responses appear here</pre>
-  </section>
-</main>
-<script>
-let token = null;
-const $ = id => document.getElementById(id);
-async function boot() {
-  try {
-    const h = await (await fetch('/health')).json();
-    $('health').textContent = 'health ok'; $('health').className = 'pill ok';
-    $('aimode').textContent = 'ai: ' + h.aiMode;
-    const ps = await (await fetch('/api/auth/personas')).json();
-    $('persona').innerHTML = '<option value="">— choose —</option>' +
-      ps.map(p => '<option value="' + p.email + '">' + p.name + ' (' + p.role + ')</option>').join('');
-  } catch (e) { $('health').textContent = 'health failed'; }
-}
-async function login() {
-  const id = $('persona').value; if (!id) return;
-  const r = await fetch('/api/auth/demo-login', { method:'POST',
-    headers:{'Content-Type':'application/json'}, body: JSON.stringify({ email: $('persona').value }) });
-  token = (await r.json()).id || null;
-  const me = await (await fetch('/api/auth/me', { headers:{ 'x-demo-token': token } })).json();
-  $('who').innerHTML = 'Signed in as <b>' + (me.profile ? me.profile.name : id) + '</b>';
-}
-async function call(method, url, body) {
-  const t0 = performance.now();
-  try {
-    const r = await fetch(url, { method, headers: Object.assign(
-      body ? {'Content-Type':'application/json'} : {}, token ? {'x-demo-token': token} : {}),
-      body: body ? JSON.stringify(body) : undefined });
-    const ms = Math.round(performance.now() - t0);
-    const data = await r.json();
-    $('status').textContent = method + ' ' + url + '  →  ' + r.status + '  (' + ms + ' ms)';
-    $('out').textContent = JSON.stringify(data, null, 2);
-  } catch (e) {
-    $('status').textContent = method + ' ' + url + '  →  failed: ' + e;
-  }
-}
-async function startAssessment() {
-  await call('POST', '/api/assessments/start', {});
-}
-boot();
-</script>
-</body>
-</html>"""
+from pathlib import Path
+CONSOLE_DIR = Path(__file__).resolve().parent
 
 
 @app.get("/console", response_class=HTMLResponse)
 async def console_page():
-    return HTMLResponse(CONSOLE_HTML)
+    return HTMLResponse((CONSOLE_DIR / "console.html").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
